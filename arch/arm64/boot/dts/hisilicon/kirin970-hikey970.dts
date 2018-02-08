@@ -9,14 +9,19 @@
 /dts-v1/;
 
 #include "kirin970.dtsi"
-#include "kirin970-gpu.dtsi"
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
 #include "kirin970_spmi.dtsi"
 #include "hisi_6421v600_pmic_spmi.dtsi"
-#include "kirin970-drm.dtsi"
+#include "kirin970_powerip.dtsi"
+#include "hisi_power_ip_test.dtsi"
+#include "kirin970-gpu.dtsi"
 #include "kirin970-ion.dtsi"
 #include "kirin970_ipc.dtsi"
+#include "kirin970-coresight.dtsi"
+#include "kirin970-drm.dtsi"
+#include "kirin970_ics_cs.dtsi"
+
 / {
 	model = "HiKey970";
 	compatible = "Hisilicon,kirin970-hikey970", "Hisilicon,kirin970";
@@ -54,8 +59,13 @@
 		};
 
 		ramoops_ram:pstore-mem{
+			compatible = "ramoops";
 			reg = <0x0 0x20A00000 0x0 0x100000>;
-			no-map;
+			record-size	= <0x00020000>;
+			console-size	= <0x00020000>;
+			ftrace-size	= <0x0>;
+			dump-oops = <0x1>;
+			ecc-size = <0x0>;
 		};
 
 		uefi-reboot-mode {
@@ -117,17 +127,6 @@
 		};
 	};
 
-	leds {
-		compatible = "gpio-leds";
-		can_active_led {
-			label = "can_active";
-			/* GPIO_012_USER_LED5*/
-			gpios = <&gpio1 4 0>;
-			linux,default-trigger = "can0-rxtx";
-			default-state = "off";
-		};
-	};
-
 	soc {
 		uart6: serial@fff32000 {
 			status = "okay";
@@ -141,11 +140,26 @@
 	leds {
 		compatible = "gpio-leds";
 
-		user_led2 {
-			label = "user_led2";
-			/* gpio_151_user_led2 */
-			gpios = <&gpio20 7 0>;
+		sdcard_active_led {
+			label = "sdcard_active";
+			/* gpio_192_user_led2 */
+			gpios = <&gpio24 0 0>;
 			linux,default-trigger = "mmc0";
+		};
+
+		gps_active_led {
+			label = "gps_active";
+			/* gpio_049_user_led6 */
+			gpios = <&gpio6 1 0>;
+			default-state = "off";
+		};
+
+		bt_active_led {
+			label = "bt_active";
+			/* gpio_019_bt_active */
+			gpios = <&gpio2 3 0>;
+			linux,default-trigger = "hci0rx";
+			default-state = "off";
 		};
 
 		wlan_active_led {
@@ -153,6 +167,14 @@
 			/* gpio_024_wifi_active */
 			gpios = <&gpio3 0 0>;
 			linux,default-trigger = "phy0tx";
+			default-state = "off";
+		};
+
+		can_active_led {
+			label = "can_active";
+			/* GPIO_012_USER_LED5*/
+			gpios = <&gpio1 4 0>;
+			linux,default-trigger = "can0-rxtx";
 			default-state = "off";
 		};
 	};
@@ -163,8 +185,6 @@
 		interrupts = <0 290 4>, <0 291 4>, <0 292 4>;
 		clocks = <&media2_crg KIRIN970_CLK_GATE_VDECFREQ>;
 		clock-names = "clk_gate_vdecfreq";
-		/*clocks = <&clk_gate_vdec>;*/
-		/*clock-names = "clk_vdec";*/
 		dec_clk_rate = <450000000>, <300000000>, <185000000>;
 		vdec_fpga = <0x1>;
 		status = "ok";
@@ -180,8 +200,6 @@
 		interrupts = <0 296 4>, <0 297 4>, <0 298 4>;
 		clocks = <&media2_crg KIRIN970_CLK_GATE_VENCFREQ>;
 		clock-names = "clk_gate_vencfreq";
-		/*clocks = <&clk_gate_venc &venc_volt_hold>;*/
-		/*clock-names = "clk_venc", "venc_volt_hold";*/
 		enc_clk_rate = <554000000>, <450000000>, <238000000>;
 		venc_fpga = <0x1>;
 		status = "ok";
@@ -196,6 +214,21 @@
 		status = "ok";
 	};
 
+	gps_en: gps-en-1-8v {
+		compatible = "regulator-fixed";
+		regulator-name = "gps-en-regulator";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+
+		/* GPIO_168_GPS_EN */
+		gpio = <&gpio21 0 0>;
+		regulator-always-on;
+
+		/* T-active: 15ms, NSTANDBY negated to device active */
+		startup-delay-us = <15000>;
+		enable-active-high;
+	};
+
 	wlan_en: wlan-en-1-8v {
 		compatible = "regulator-fixed";
 		regulator-name = "wlan-en-regulator";
@@ -204,11 +237,35 @@
 
 		/* GPIO_051_WIFI_EN */
 		gpio = <&gpio6 3 0>;
-		regulator-always-on;
+		/* regulator-always-on; */
 
 		/* WLAN card specific delay */
 		startup-delay-us = <70000>;
 		enable-active-high;
+	};
+
+	/* bluetooth - TI WL1837 */
+	kim {
+		compatible = "kim";
+		/*
+		 * FIXME: The following is complete CRAP since
+		 * the vendor driver doesn't follow the gpio
+		 * binding. Passing in a magic Linux gpio number
+		 * here until we fix the vendor driver.
+		 */
+		/* BT_EN: GPIO_054_BT_EN */
+		nshutdown_gpio = <462>;
+		dev_name = "/dev/ttyAMA4";
+		flow_cntrl = <1>;
+		baud_rate = <115200>;
+		/* baud_rate = <3000000>; */
+		/* baud_rate = <230400>; ok */
+		/* baud_rate = <921600>; ok */
+		/* baud_rate = <1500000>; nok */
+	};
+
+	btwilink {
+		compatible = "btwilink";
 	};
 };
 
@@ -234,5 +291,20 @@
 		/* WL_IRQ, GPIO_177_WL_WAKEUP_AP */
 		interrupt-parent = <&gpio22>;
 		interrupts = <1 IRQ_TYPE_EDGE_RISING>;
+	};
+};
+
+&uart3 {
+	/* GPS BCM47531 */
+	status = "okay";
+};
+
+&uart4 {
+	status = "okay";
+
+	bluetooth {
+		compatible = "ti,wl1837-st";
+		enable-gpios = <&gpio6 6 GPIO_ACTIVE_HIGH>; /* gpio_054 */
+		max-speed = <921600>;
 	};
 };
