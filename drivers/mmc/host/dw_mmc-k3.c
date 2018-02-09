@@ -337,10 +337,10 @@ static int dw_mci_get_best_clksmpl(unsigned int sample_flag)
 	i = ffs(sample_flag) - 1;
 
 	/*
-	* A clock cycle is divided into 32 phases,
-	* each of which is represented by a bit,
-	* finding the optimal phase.
-	*/
+	 * A clock cycle is divided into 32 phases,
+	 * each of which is represented by a bit,
+	 * finding the optimal phase.
+	 */
 	while (i < 32) {
 		v = ror32(sample_flag, i);
 		len = ffs(~v) - 1;
@@ -419,6 +419,9 @@ static int dw_mci_hi3660_switch_voltage(struct mmc_host *mmc,
 		ret = dw_mci_set_sel18(host, 0);
 	else if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180)
 		ret = dw_mci_set_sel18(host, 1);
+	else
+		dev_err(host->dev, "voltage not supported\n");
+
 	if (ret)
 		return ret;
 
@@ -442,6 +445,7 @@ static const struct dw_mci_drv_data hi3660_data = {
 };
 
 static const struct of_device_id dw_mci_k3_match[] = {
+	{ .compatible = "hisilicon,hi3670-dw-mshc", .data = &hi3660_data, },
 	{ .compatible = "hisilicon,hi3660-dw-mshc", .data = &hi3660_data, },
 	{ .compatible = "hisilicon,hi4511-dw-mshc", .data = &k3_drv_data, },
 	{ .compatible = "hisilicon,hi6220-dw-mshc", .data = &hi6220_data, },
