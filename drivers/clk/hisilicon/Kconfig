@@ -29,6 +29,13 @@ config COMMON_CLK_HI3670
 	help
 	  Build the clock driver for hi3670.
 
+config COMMON_CLK_KIRIN970
+	bool "Kirin970 Clock Driver"
+	depends on ARCH_HISI || COMPILE_TEST
+	default ARCH_HISI
+	help
+	  Build the clock driver for kirin970.
+
 config COMMON_CLK_HI3798CV200
 	tristate "Hi3798CV200 Clock Driver"
 	depends on ARCH_HISI || COMPILE_TEST
